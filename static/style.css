@@ -1,0 +1,33 @@
+:root{--bg:#0d0d14;--card:#171724;--line:#2a2a40;--txt:#eee;--dim:#9a9ab5;--gold:#e0b64a;--red:#d8434f;--green:#3fb67a}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;background:radial-gradient(circle at top,#1d1530,var(--bg) 60%);color:var(--txt);font:16px/1.4 -apple-system,system-ui,sans-serif;min-height:100vh}
+#app{max-width:520px;margin:0 auto;padding:16px 16px calc(24px + env(safe-area-inset-bottom))}
+h1{font-size:34px;text-align:center;letter-spacing:4px;margin:28px 0 4px;color:var(--gold);text-transform:uppercase}
+h2{margin:6px 0 10px;font-size:22px}
+.sub{text-align:center;color:var(--dim);margin-bottom:22px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin:12px 0}
+.dim{color:var(--dim);font-size:14px}
+input,select{width:100%;padding:13px;border-radius:10px;border:1px solid var(--line);background:#0f0f1a;color:var(--txt);font-size:17px}
+label{display:block;margin:10px 0 4px;color:var(--dim);font-size:14px}
+button{width:100%;padding:14px;border:0;border-radius:10px;background:var(--gold);color:#1a1405;font-size:17px;font-weight:700;margin-top:10px}
+button.sec{background:#2a2a40;color:var(--txt)}
+button.red{background:var(--red);color:#fff}
+button.green{background:var(--green);color:#06150d}
+button:disabled{opacity:.4}
+.row{display:flex;gap:8px;align-items:center}
+.row>*{flex:1}
+.code{font-size:44px;letter-spacing:10px;text-align:center;color:var(--gold);font-weight:800}
+.top{display:flex;justify-content:space-between;align-items:center;color:var(--dim);font-size:14px}
+.timer{font-size:30px;font-weight:800;color:var(--gold);text-align:center}
+.role{text-align:center;padding:26px 10px;border-radius:16px;border:2px solid}
+.role.traitor{border-color:var(--red);background:#2a1016}.role.loyalist{border-color:var(--green);background:#0e2219}
+.role b{font-size:34px;display:block;text-transform:uppercase;letter-spacing:3px}
+.p{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border-radius:10px;border:1px solid var(--line);margin:6px 0;background:#10101b}
+.p.dead{opacity:.45;text-decoration:line-through}
+.p.pick{border-color:var(--gold);background:#2a2410}
+.tag{font-size:12px;padding:2px 8px;border-radius:99px;margin-left:6px;text-decoration:none;display:inline-block}
+.tag.traitor{background:var(--red)}.tag.loyalist{background:var(--green);color:#06150d}.tag.host{background:#3a3a58}
+.log div{padding:6px 0;border-bottom:1px solid var(--line);font-size:14px}
+.big{font-size:56px;text-align:center}
+#toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--red);color:#fff;padding:10px 16px;border-radius:10px;opacity:0;transition:.25s;pointer-events:none;max-width:90%}
+#toast.show{opacity:1}
