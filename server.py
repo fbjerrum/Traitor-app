@@ -4,7 +4,6 @@
 Run:  python3 server.py [port]
 Players open http://<your-ip>:<port> on their phones.
 """
-import hashlib
 import json
 import mimetypes
 import os
@@ -419,18 +418,15 @@ def new_code():
 
 
 # ---------- accounts & persistence ----------
-ACCOUNTS = {}  # lowercase username -> {name, salt, hash}
+ACCOUNTS = {}  # lowercase username -> {name, code}
+ADMIN = {"code": ""}
 SESSIONS = {}  # session token -> lowercase username
 FAILS = {}  # lowercase username -> (count, locked_until)
 USER_RE = re.compile(r"^[A-Za-z0-9_ÆØÅæøå-]{2,20}$")
 
 
-def hash_code(salt, code):
-    return hashlib.pbkdf2_hmac("sha256", code.encode(), bytes.fromhex(salt), 100_000).hex()
-
-
 def save():
-    data = {"accounts": ACCOUNTS, "sessions": SESSIONS,
+    data = {"admin": ADMIN["code"], "accounts": ACCOUNTS, "sessions": SESSIONS,
             "rooms": {c: r.__dict__ for c, r in ROOMS.items()}}
     tmp = DATA_FILE + ".tmp"
     fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
@@ -444,6 +440,7 @@ def load():
         return
     with open(DATA_FILE) as f:
         data = json.load(f)
+    ADMIN["code"] = data.get("admin", "")
     ACCOUNTS.update(data.get("accounts", {}))
     SESSIONS.update(data.get("sessions", {}))
     for code, d in data.get("rooms", {}).items():
@@ -481,10 +478,11 @@ def register(body):
     key = name.lower()
     if key in ACCOUNTS:
         raise GameError("Username already taken")
-    code = f"{secrets.randbelow(10**6):06d}"
-    salt = secrets.token_hex(16)
-    ACCOUNTS[key] = {"name": name, "salt": salt, "hash": hash_code(salt, code)}
-    return {"name": name, "code": code, "token": new_session(key)}
+    code = str(body.get("code", ""))
+    if not 4 <= len(code) <= 30:
+        raise GameError("Login code must be 4-30 characters")
+    ACCOUNTS[key] = {"name": name, "code": code}
+    return {"name": name, "token": new_session(key)}
 
 
 def new_session(key):
@@ -493,16 +491,27 @@ def new_session(key):
     return token
 
 
+def admin_users(body):
+    until = FAILS.get("\0admin", (0, 0))[1]
+    if until > time.time():
+        raise GameError(f"Too many attempts. Try again in {int(until - time.time()) + 1}s")
+    if not secrets.compare_digest(str(body.get("admin", "")).encode(), ADMIN["code"].encode()):
+        count = FAILS.get("\0admin", (0, 0))[0] + 1
+        FAILS["\0admin"] = (0, time.time() + 30) if count >= 5 else (count, 0)
+        raise GameError("Wrong admin password")
+    FAILS.pop("\0admin", None)
+    return {"users": sorted(({"name": a["name"], "code": a["code"], "game": bool(room_of(k))}
+                            for k, a in ACCOUNTS.items()), key=lambda u: u["name"].lower())}
+
+
 def login(body):
     key = " ".join(str(body.get("name", "")).split()).lower()
     count, until = FAILS.get(key, (0, 0))
     if until > time.time():
         raise GameError(f"Too many attempts. Try again in {int(until - time.time()) + 1}s")
     acc = ACCOUNTS.get(key)
-    code = "".join(c for c in str(body.get("code", "")) if c.isdigit())
-    # Hash even for unknown users so timing does not reveal which usernames exist
-    salt = acc["salt"] if acc else "00" * 16
-    ok = secrets.compare_digest(hash_code(salt, code), acc["hash"] if acc else "x")
+    code = str(body.get("code", ""))[:30]
+    ok = secrets.compare_digest(code.encode(), (acc["code"] if acc else "").encode())
     if not acc or not ok:
         count += 1
         FAILS[key] = (0, time.time() + 30) if count >= 5 else (count, 0)
@@ -514,7 +523,7 @@ def login(body):
 def handle_api(path, body):
     with LOCK:
         result = _handle_api(path, body)
-        if path not in ("/api/state", "/api/login"):
+        if path not in ("/api/state", "/api/login", "/api/admin"):
             save()
         return result
 
@@ -524,6 +533,8 @@ def _handle_api(path, body):
         return register(body)
     if path == "/api/login":
         return login(body)
+    if path == "/api/admin":
+        return admin_users(body)
     token = str(body.get("token", ""))
     user = SESSIONS.get(token)
     if not user:
@@ -641,6 +652,13 @@ def lan_ip():
 if __name__ == "__main__":
     port = int(sys.argv[1]) if len(sys.argv) > 1 else 8000
     load()
+    env_admin = os.environ.get("TRAITORS_ADMIN")
+    if env_admin:
+        ADMIN["code"] = env_admin
+    elif not ADMIN["code"]:
+        ADMIN["code"] = secrets.token_urlsafe(9)
+    save()
+    print(f"Admin password: {ADMIN['code']}  (open /#admin to see all login codes)")
     threading.Thread(target=ticker, daemon=True).start()
     srv = ThreadingHTTPServer(("0.0.0.0", port), Handler)
     srv.daemon_threads = True

@@ -1,7 +1,7 @@
 "use strict";
 const app = document.getElementById("app");
 let token = localStorage.getItem("traitors_token") || "";
-let newCode = null, authTab = "login";
+let adminPw = "", authTab = "login";
 let state = null, lastKey = "", picked = null, nightKind = "murder", timerAt = 0, stepKey = "";
 
 const esc = s => String(s).replace(/[&<>"']/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[c]));
@@ -37,7 +37,7 @@ function setState(s) {
 }
 
 async function poll() {
-  if (token && !newCode) {
+  if (token) {
     try { setState(await api("/api/state")); }
     catch (e) {
       if (/Not logged in/i.test(e.message)) resetSession();
@@ -62,7 +62,6 @@ setInterval(() => {
 
 function render() {
   if (!token) return renderAuth();
-  if (newCode) return renderNewCode();
   if (!state) return;
   if (state.home) return renderHome();
   const fn = {lobby, role: rolePhase, night, offer, dawn: dawnPhase, discussion, vote, result, decision, end}[state.phase];
@@ -70,41 +69,44 @@ function render() {
   bind();
 }
 
+function renderAdmin(users, err) {
+  app.innerHTML = `<h1>Admin</h1>
+  ${users ? `<div class="card"><b>All players (${users.length})</b>${users.map(u => `<div class="p"><span>${esc(u.name)}${u.game ? ' <span class="tag host">in game</span>' : ""}</span><code style="font-size:17px">${esc(u.code)}</code></div>`).join("") || '<div class="dim">No players yet</div>'}</div>
+  <button id="aref">Refresh</button>`
+  : `<div class="card"><label>Admin password (printed in the server console)</label><input id="apw" type="password"><button id="alogin">Show login codes</button></div>`}
+  <button class="sec" id="aback">Back</button>`;
+  const load = async pw => {
+    try { const r = await api("/api/admin", {admin: pw}); renderAdmin(r.users); adminPw = pw; }
+    catch (e) { toast(e.message); }
+  };
+  const b = id => document.getElementById(id);
+  if (b("alogin")) b("alogin").onclick = () => load(b("apw").value);
+  if (b("aref")) b("aref").onclick = () => load(adminPw);
+  b("aback").onclick = () => { adminPw = ""; location.hash = ""; render(); };
+}
+
 function renderAuth() {
+  if (location.hash === "#admin") return renderAdmin();
   const reg = authTab === "register";
   app.innerHTML = `<h1>Traitors</h1><div class="sub">Trust no one.</div>
   <div class="row"><button class="${reg ? "sec" : ""}" data-tab="login">Log in</button><button class="${reg ? "" : "sec"}" data-tab="register">New player</button></div>
   <div class="card"><label>Username</label><input id="user" maxlength="20" autocomplete="username" autocapitalize="off">
-  ${reg ? '<div class="dim" style="margin-top:8px">You will get a personal login code. Save it to log in again.</div>'
-        : '<label>Login code</label><input id="lcode" inputmode="numeric" maxlength="7" autocomplete="current-password">'}
-  <button id="auth">${reg ? "Create account" : "Log in"}</button></div>`;
+  <label>${reg ? "Choose a login code (4+ characters, remember it!)" : "Login code"}</label>
+  <input id="lcode" type="password" maxlength="30" autocomplete="${reg ? "new-password" : "current-password"}">
+  ${reg ? '<div class="dim">Note: the game admin can see everyone\'s login code — don\'t reuse a password from anywhere else.</div>' : ""}
+  <button id="auth">${reg ? "Create account" : "Log in"}</button></div>
+  <div style="text-align:center"><a id="adminlink" class="dim" style="text-decoration:underline">Admin</a></div>`;
+  document.getElementById("adminlink").onclick = () => { location.hash = "#admin"; render(); };
   app.querySelectorAll("[data-tab]").forEach(el => el.onclick = () => { authTab = el.dataset.tab; render(); });
   const submit = async () => {
-    const name = document.getElementById("user").value;
+    const name = document.getElementById("user").value, code = document.getElementById("lcode").value;
     try {
-      if (reg) {
-        const r = await api("/api/register", {name});
-        token = r.token; newCode = r.code; state = null;
-        localStorage.setItem("traitors_token", token);
-        render();
-      } else {
-        const r = await api("/api/login", {name, code: document.getElementById("lcode").value});
-        token = r.token; localStorage.setItem("traitors_token", token);
-        setState(await api("/api/state"));
-      }
+      const r = await api(reg ? "/api/register" : "/api/login", {name, code});
+      token = r.token; localStorage.setItem("traitors_token", token);
+      setState(await api("/api/state"));
     } catch (e) { toast(e.message); }
   };
   document.getElementById("auth").onclick = submit;
-}
-
-function renderNewCode() {
-  app.innerHTML = `<h1>Welcome</h1><div class="card"><div class="dim" style="text-align:center">Your login code — write it down. It is shown only once.</div>
-  <div class="code">${newCode}</div></div>
-  <button id="saved">I have saved it</button>`;
-  document.getElementById("saved").onclick = async () => {
-    newCode = null; lastKey = "";
-    try { setState(await api("/api/state")); } catch (e) { toast(e.message); }
-  };
 }
 
 function renderHome() {

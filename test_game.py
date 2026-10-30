@@ -23,12 +23,18 @@ def main():
     srv = server.ThreadingHTTPServer(("127.0.0.1", 8123), server.Handler)
     threading.Thread(target=srv.serve_forever, daemon=True).start()
 
-    regs = [call("/api/register", name=f"P{i}") for i in range(7)]
-    codes = [r["code"] for r in regs]
+    codes = [f"secret{i}" for i in range(7)]
+    regs = [call("/api/register", name=f"P{i}", code=codes[i]) for i in range(7)]
     toks = [r["token"] for r in regs]
-    assert "error" in call("/api/register", name="p1"), "duplicate username"
-    assert "error" in call("/api/login", name="P1", code="000000" if codes[1] != "000000" else "111111")
+    assert "error" in call("/api/register", name="p1", code="whatever"), "duplicate username"
+    assert "error" in call("/api/register", name="Short", code="abc"), "code too short"
+    assert "error" in call("/api/login", name="P1", code="wrongcode")
     assert "error" in call("/api/state", token="bogus"), "bad token"
+
+    server.ADMIN["code"] = "adminpw"
+    assert "error" in call("/api/admin", admin="nope")
+    users = call("/api/admin", admin="adminpw")["users"]
+    assert {u["name"]: u["code"] for u in users} == {f"P{i}": codes[i] for i in range(7)}
 
     # logout invalidates the session; login with the code works again
     call("/api/logout", token=toks[1])

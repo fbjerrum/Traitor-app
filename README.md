@@ -12,9 +12,10 @@ Everyone on the same Wi-Fi opens the printed `http://<ip>:<port>` URL.
 
 ## Accounts
 
-- Tap **New player**, pick a username, and you get a personal 6-digit **login code** (shown once, so write it down).
+- Tap **New player** and pick a username and your own **login code** (4-30 characters; it cannot be recovered, so remember it).
 - Log in later with username + code. **Log out** whenever you like; your seat in a game stays reserved, so you can log in again (even from another phone) and carry on.
 - Only the host's computer has to keep running. Accounts and games are saved to `data.json` (git-ignored) and restored when the server restarts. Set `TRAITORS_DATA` to use another file.
+- **Admin:** the server prints an admin password at startup (stored in `data.json`, or set `TRAITORS_ADMIN`). Open the site, tap **Admin** at the bottom of the login screen and enter it to see every player's login code. Codes are stored readable in `data.json` so the admin can see them; players are warned not to reuse real passwords.
 - After 5 wrong login attempts a username is locked for 30 seconds.
 
 One person creates a game and shares the 4-letter room code; others join with it. The creator is the host. A player can be in one game at a time and can leave only in the lobby or after the game ends.
